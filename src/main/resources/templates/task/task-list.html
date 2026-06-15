@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>TaskPro — タスク管理</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <link rel="stylesheet" th:href="@{/css/style.css}" />
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-white mb-4">
+  <div class="container">
+    <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+      <span class="brand-mark">TP</span>
+      <span class="fw-bold">TaskPro</span>
+      <span class="badge bg-warning text-dark small">Beta</span>
+    </a>
+
+    <div class="ms-auto d-flex align-items-center gap-2">
+      <div class="btn-group me-1">
+        <button class="btn btn-outline-light btn-sm dropdown-toggle" type="button" id="themeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          <i class="bi bi-circle-half"></i> テーマ
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="themeDropdown">
+          <li><a class="dropdown-item theme-option" href="#" data-theme="blue">Blue</a></li>
+          <li><a class="dropdown-item theme-option" href="#" data-theme="dark">Dark</a></li>
+          <li><a class="dropdown-item theme-option" href="#" data-theme="green">Green</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item theme-option" href="#" data-theme="system">システムに合わせる</a></li>
+        </ul>
+      </div>
+
+      <button id="exportCsvBtn" class="btn btn-outline-light btn-sm" title="表示中のタスクをCSV出力">
+        <i class="bi bi-download"></i> CSV
+      </button>
+
+      <button class="btn btn-outline-light btn-sm d-none d-md-inline" title="アップグレード">
+        <i class="bi bi-star-fill me-1"></i> Proへ
+      </button>
+
+      <a th:href="@{/h2-console}" target="_blank" class="btn btn-outline-secondary btn-sm">H2</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero mb-4">
+  <div class="container">
+    <div class="row align-items-center gx-4">
+      <div class="col-md-7">
+        <h1 class="hero-title">洗練されたタスク管理を、すぐに。</h1>
+        <p class="hero-sub">シンプルでプロフェッショナルな操作性。チームや個人利用のどちらにも対応する設計。</p>
+
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#createTaskModal">
+            <i class="bi bi-plus-lg me-2"></i> 新しいタスク
+          </button>
+          <a class="btn btn-outline-light btn-lg" href="#" role="button">
+            <i class="bi bi-box-seam me-1"></i> Proプランを見る
+          </a>
+        </div>
+
+        <div class="mt-4 d-flex gap-3">
+          <div class="stat">
+            <div class="stat-num" th:text="${tasks.size()}">0</div>
+            <div class="stat-label">合計タスク</div>
+          </div>
+          <div class="stat">
+            <div class="stat-num" id="statDone">0</div>
+            <div class="stat-label">完了済み</div>
+          </div>
+        </div>
+      </div>
+
+        <div class="col-md-5 d-none d-md-block">
+          <div class="hero-visual">
+            <!-- 表示中のタスク数（ステータス別）: 統一されたプログレスバー -->
+            <div id="heroChart" class="w-100" aria-hidden="false">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="small text-muted" id="heroTitle">表示中: <span id="heroTotal" th:text="${tasks.size()}">0</span> 件</div>
+                <div class="d-flex gap-2">
+                  <div class="text-muted small">未着手 (<span id="countNotStarted">0</span>)</div>
+                  <div class="text-muted small">進行中 (<span id="countInProgress">0</span>)</div>
+                  <div class="text-muted small">完了 (<span id="countDone">0</span>)</div>
+                </div>
+              </div>
+              <div class="progress" style="height:18px;border-radius:10px;overflow:hidden;">
+                <div id="pgNotStarted" class="progress-bar bg-secondary" role="progressbar" style="width:0%"></div>
+                <div id="pgInProgress" class="progress-bar bg-primary" role="progressbar" style="width:0%"></div>
+                <div id="pgDone" class="progress-bar bg-success" role="progressbar" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+    </div>
+  </div>
+</section>
+
+<div class="container">
+  <div class="card task-card shadow-sm mb-4">
+    <div class="card-body py-3 d-flex justify-content-between align-items-center">
+      <div class="d-flex gap-2 align-items-center">
+        <div class="input-group me-2 d-none d-sm-flex" style="min-width:280px;">
+          <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+          <input type="search" id="taskSearch" class="form-control" placeholder="タスク名・説明で検索" aria-label="タスク検索">
+          <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" aria-label="検索をクリア"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="small text-muted">フィルタ：</div>
+        <select id="filterPriority" class="form-select form-select-sm" style="width:140px;">
+          <option value="">全ての優先度</option>
+          <option value="A">A：高</option>
+          <option value="B">B：中</option>
+          <option value="C">C：低</option>
+        </select>
+
+        <select id="filterStatus" class="form-select form-select-sm" style="width:160px;">
+          <option value="">全てのステータス</option>
+          <option value="未着手">未着手</option>
+          <option value="進行中">進行中</option>
+          <option value="完了">完了</option>
+        </select>
+      </div>
+
+      <div class="small text-muted">全 <span th:text="${tasks.size()}">0</span> 件</div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0 task-table">
+        <thead class="table-light">
+          <tr>
+            <th style="width:6%;">ID</th>
+            <th style="width:48%;">タスク</th>
+            <th style="width:14%;">優先度</th>
+            <th style="width:12%;">ステータス</th>
+            <th style="width:20%;" class="text-center">操作</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr th:if="${#lists.isEmpty(tasks)}">
+            <td colspan="5" class="text-center text-muted py-4">登録されているタスクはありません。</td>
+          </tr>
+
+          <tr th:each="task : ${tasks}" th:attr="data-priority=${task.priority},data-status=${task.status}" class="fade-in-up">
+            <td th:text="${task.id}">1</td>
+
+            <td>
+              <div class="d-flex align-items-start gap-3">
+                <div class="priority-dot" th:classappend="${task.priority == 'A' ? ' bg-danger' : (task.priority == 'B' ? ' bg-warning' : ' bg-secondary')}"></div>
+                <div>
+                  <div class="fw-semibold task-title" th:text="${task.title}">タスク名</div>
+                  <div class="small text-muted task-description" th:text="${task.description}">タスク説明</div>
+                </div>
+              </div>
+            </td>
+
+            <td>
+              <span th:if="${task.priority == 'A'}" class="badge text-bg-danger">A：高</span>
+              <span th:if="${task.priority == 'B'}" class="badge text-bg-warning">B：中</span>
+              <span th:if="${task.priority == 'C'}" class="badge text-bg-secondary">C：低</span>
+            </td>
+
+            <td>
+              <span th:if="${task.status == '未着手'}" class="badge text-bg-secondary">未着手</span>
+              <span th:if="${task.status == '進行中'}" class="badge text-bg-primary">進行中</span>
+              <span th:if="${task.status == '完了'}" class="badge text-bg-success">完了</span>
+            </td>
+
+            <td class="text-center">
+              <div class="operation-buttons">
+                <button type="button" class="btn btn-sm btn-outline-info" data-bs-toggle="modal" th:attr="data-bs-target='#detailTaskModal-' + ${task.id}" title="詳細">
+                  <i class="bi bi-eye"></i>
+                </button>
+
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" th:attr="data-bs-target='#editTaskModal-' + ${task.id}" title="編集">
+                  <i class="bi bi-pencil"></i>
+                </button>
+
+                <form th:action="@{/tasks/{taskId}/delete(taskId=${task.id})}" method="post" th:id="'deleteForm-' + ${task.id}" class="d-inline">
+                  <!-- CSRF 必要ならここに追加 -->
+                  <button type="button" class="btn btn-sm btn-outline-danger btn-delete" th:data-task-title="${task.title}" th:data-form-id="'deleteForm-' + ${task.id}" title="削除">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- モーダル群（既存フォームを踏襲） -->
+<div class="modal fade" id="createTaskModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form th:action="@{/tasks/new}" method="post">
+        <div class="modal-header">
+          <h5 class="modal-title">タスク新規登録</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="閉じる"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="createTitle" class="form-label">タスク名 <span class="text-danger">*</span></label>
+            <input type="text" id="createTitle" name="title" class="form-control" maxlength="100" required>
+          </div>
+          <div class="mb-3">
+            <label for="createDescription" class="form-label">タスク説明</label>
+            <textarea id="createDescription" name="description" class="form-control" rows="4" maxlength="1000"></textarea>
+          </div>
+          <div class="mb-3">
+            <label for="createPriority" class="form-label">優先度 <span class="text-danger">*</span></label>
+            <select id="createPriority" name="priority" class="form-select" required>
+              <option value="">選択してください</option>
+              <option value="A">A：高</option>
+              <option value="B">B：中</option>
+              <option value="C">C：低</option>
+            </select>
+          </div>
+          <div class="alert alert-info mb-0">登録時のステータスは自動的に「未着手」になります。</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+          <button type="submit" class="btn btn-primary">登録</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- 詳細・編集・削除モーダル（既存のまま） -->
+<div th:each="task : ${tasks}" class="modal fade" th:id="'detailTaskModal-' + ${task.id}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header bg-info-subtle">
+        <h5 class="modal-title">タスク詳細</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-bold">ID</label>
+          <div class="form-control-plaintext" th:text="${task.id}">1</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">タスク名</label>
+          <div class="form-control-plaintext" th:text="${task.title}">タスク名</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label fw-bold">タスク説明</label>
+          <div class="border rounded bg-light p-3 detail-description" th:text="${task.description}">タスク説明</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div th:each="task : ${tasks}" class="modal fade" th:id="'editTaskModal-' + ${task.id}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form th:action="@{/tasks/{taskId}/edit(taskId=${task.id})}" method="post">
+        <div class="modal-header bg-primary-subtle">
+          <h5 class="modal-title">タスク編集</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label th:for="'editTitle-' + ${task.id}" class="form-label">タスク名 <span class="text-danger">*</span></label>
+            <input type="text" th:id="'editTitle-' + ${task.id}" name="title" class="form-control" th:value="${task.title}" maxlength="100" required>
+          </div>
+          <div class="mb-3">
+            <label th:for="'editDescription-' + ${task.id}" class="form-label">タスク説明</label>
+            <textarea th:id="'editDescription-' + ${task.id}" name="description" class="form-control" rows="4" maxlength="1000" th:text="${task.description}"></textarea>
+          </div>
+          <div class="mb-3">
+            <label th:for="'editPriority-' + ${task.id}" class="form-label">優先度 <span class="text-danger">*</span></label>
+            <select th:id="'editPriority-' + ${task.id}" name="priority" class="form-select" required>
+              <option value="A" th:selected="${task.priority == 'A'}">A：高</option>
+              <option value="B" th:selected="${task.priority == 'B'}">B：中</option>
+              <option value="C" th:selected="${task.priority == 'C'}">C：低</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label th:for="'editStatus-' + ${task.id}" class="form-label">ステータス <span class="text-danger">*</span></label>
+            <select th:id="'editStatus-' + ${task.id}" name="status" class="form-select" required>
+              <option value="未着手" th:selected="${task.status == '未着手'}">未着手</option>
+              <option value="進行中" th:selected="${task.status == '進行中'}">進行中</option>
+              <option value="完了" th:selected="${task.status == '完了'}">完了</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">閉じる</button>
+          <button type="submit" class="btn btn-primary">更新</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">削除の確認</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">以下のタスクを本当に削除しますか？</p>
+        <p class="fw-semibold mt-2" id="deleteTaskTitle">—</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">キャンセル</button>
+        <button type="button" class="btn btn-danger btn-sm" id="confirmDeleteBtn">削除する</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:src="@{/js/script.js}"></script>
+</body>
+</html>

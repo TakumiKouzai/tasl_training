@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="ja" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"/><title>タスク詳細</title></head>
+<body>
+  <h1 th:text="${task.title}">タイトル</h1>
+  <p><strong>優先度：</strong><span th:text="${task.priority}">A</span></p>
+  <p><strong>ステータス：</strong><span th:text="${task.status}">未着手</span></p>
+  <p><strong>作成日：</strong><span th:text="${#temporals.format(task.createdAt,'yyyy-MM-dd')}">2026-06-15</span></p>
+  <p><strong>説明：</strong></p>
+  <pre th:text="${task.description}">説明</pre>
+  <p>
+    <a th:href="@{/tasks/{id}/edit(id=${task.id})}">編集</a> |
+    <form th:action="@{/tasks/{id}/delete(id=${task.id})}" method="post" style="display:inline">
+      <button type="submit">削除</button>
+    </form>
+  </p>
+  <p><a href="/tasks">一覧へ戻る</a></p>
+</body>
+</html>
